@@ -1,0 +1,9 @@
+{
+	"Repository" : "https://bitbucket.org/DaizongZhang/androidtestcase01",
+	"Android" : {
+		"Store" : "/etc/go-pac/crt/android/go-pac.keystore",
+		"StorePassword" : "go-pac",
+		"Alias" : "go-pac",
+		"AliasPassword" : "go-pac"
+	}
+}
