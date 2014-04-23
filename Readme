@@ -6,3 +6,4 @@ use make to generate the binary file named 'go-pac'
 flag description
 -v verbose
 -f input json configuration file
+-o output file 
