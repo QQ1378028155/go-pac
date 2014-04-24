@@ -31,6 +31,7 @@ func init() {
 		"key.alias.password=%s"
 }
 
+//Run it.
 func Run(filename, outfile string) (err error) {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -47,7 +48,7 @@ func Run(filename, outfile string) (err error) {
 		return
 	}
 	if config.Repository == nil {
-		err = errors.New("Repository must be set.")
+		err = errors.New("repository must be set")
 		return
 	}
 	err = fetchFromRemote(*config.Repository)
@@ -164,7 +165,7 @@ func compileXcode(config *conf.XcodeConfig, outfile string) (err error) {
 		}
 	}
 	if appPath == "" {
-		err = errors.New(".app file not found!")
+		err = errors.New(".app file not found")
 		return
 	}
 	logger.Debug("Find .app file at " + appPath)
@@ -268,7 +269,7 @@ func compileAndroid(config *conf.AndroidConfig, outfile string) (err error) {
 	}
 
 	if targetApkPath == "" {
-		err = errors.New("No apk found")
+		err = errors.New("no apk found")
 	}
 	logger.Debug("Find " + targetApkPath)
 	// targetApkPath records the absolute path of target apk.
@@ -326,7 +327,7 @@ func fetchFromRemote(repo string) (err error) {
 func getRepoDir(repo string) (string, string, error) {
 	strs := strings.Split(repo, "/")
 	if len(strs) == 1 {
-		return "", "", errors.New("Invalid Repository.")
+		return "", "", errors.New("invalid repository")
 	}
 	return strs[len(strs)-2], strs[len(strs)-1], nil
 }

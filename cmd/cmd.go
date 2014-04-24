@@ -4,6 +4,7 @@ import "errors"
 import "os/exec"
 import "github.com/QQ1378028155/go-pac/logger"
 
+//SyncCmd can run a command synchronically
 func SyncCmd(name string, arg []string) error {
 	if arg == nil {
 		return errors.New("invalid args")
@@ -14,13 +15,5 @@ func SyncCmd(name string, arg []string) error {
 	if err != nil {
 		return err
 	}
-	//err := cmd.Start()
-	//if err != nil {
-	//	return err
-	//}
-	//err = cmd.Wait()
-	//if err != nil {
-	//	return err
-	//}
 	return nil
 }
