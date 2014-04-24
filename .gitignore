@@ -1,3 +1,2 @@
 *.swp
-*.json
-!example.json
+*.sh

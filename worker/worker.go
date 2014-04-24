@@ -15,9 +15,12 @@ import "regexp"
 var antPropertyTemplate string
 
 var (
+	absolutePathReg, _ = regexp.Compile("^/")
+	appReg, _          = regexp.Compile("\\.app$")
 	apkReg, _          = regexp.Compile("\\.apk$") // regular expression to find the file
 	unsignedapkReg, _  = regexp.Compile("-unsigned\\.apk$")
 	unalignedapkReg, _ = regexp.Compile("-unaligned\\.apk$")
+	xcodeprojReg, _    = regexp.Compile("\\.xcodeproj$")
 	workdir, _         = os.Getwd() //record the base info
 )
 
@@ -53,6 +56,134 @@ func Run(filename, outfile string) (err error) {
 	}
 	if config.Android != nil {
 		return compileAndroid(config.Android, outfile)
+	}
+	if config.Xcode != nil {
+		return compileXcode(config.Xcode, outfile)
+	}
+	return
+}
+
+func compileXcode(config *conf.XcodeConfig, outfile string) (err error) {
+	// find the *.xcodeproj file under the working directory
+	// if multiple xcodeproj file exists, it picks one of them.
+	var wdnow string
+	wdnow, err = os.Getwd()
+	if err != nil {
+		return
+	}
+	wdf, err := os.Open(wdnow)
+	defer wdf.Close()
+	if err != nil {
+		return
+	}
+	logger.Debug("Read Directory " + wdnow)
+	fileInfos, err := wdf.Readdir(0)
+
+	if err != nil {
+		return
+	}
+	var prjName string //project name without *.xcodeproj suffix
+	for i := 0; i < len(fileInfos); i++ {
+		if fileInfos[i].IsDir() == false { // .xcodeproj file is a directory
+			continue
+		}
+		b := xcodeprojReg.Match([]byte(fileInfos[i].Name()))
+		if b == true {
+			bytes := []byte(fileInfos[i].Name())
+			prjName = string(bytes[:len(bytes)-10])
+			break
+		}
+	}
+	if prjName == "" {
+		err = errors.New("cannot find the *.xcodeproj file")
+		return
+	}
+	logger.Debug("Found target " + prjName)
+
+	// clean the project
+	err = cmd.SyncCmd("xcodebuild", []string{"-sdk", "iphoneos", "-target", prjName, "-configuration", "Release", "clean"})
+	if err != nil {
+		return
+	}
+
+	// build the project. If config.Sign is set, use the Sign.
+	if config.Sign == nil {
+		err = cmd.SyncCmd("xcodebuild", []string{"-sdk", "iphoneos", "-target", prjName, "-configuration", "Release", "CODE_SIGN_IDENTITY=", "CODE_SIGNING_REQUIRED=NO"})
+	} else {
+		err = cmd.SyncCmd("xcodebuild", []string{"-sdk", "iphoneos", "-target", prjName, "-configuration", "Release", "CODE_SIGN_IDENTITY=\"" + *config.Sign + "\""})
+	}
+	if err != nil {
+		logger.Debug("xcodebuild failed")
+		return
+	}
+	// find the .app file,mostly in ./build or ./build/Release-iphoneos
+	var appPath string
+	buildDir, err := os.Open("./build")
+	if err != nil {
+		return
+	}
+	defer buildDir.Close()
+	fileInfos, err = buildDir.Readdir(0)
+	if err != nil {
+		return
+	}
+	buildwd, err := os.Getwd()
+	if err != nil {
+		return
+	}
+	for i := 0; i < len(fileInfos); i++ {
+		// .app file is a dir
+		if fileInfos[i].IsDir() == false {
+			continue
+		}
+		b := appReg.Match([]byte(fileInfos[i].Name()))
+		if b == true {
+			appPath = buildwd + "/build/" + fileInfos[i].Name()
+			break
+		}
+	}
+	if appPath == "" { //Not found in ./build,try to find it in ./build/Release-iphoneos
+		var releaseDir *os.File
+		releaseDir, err = os.Open("./build/Release-iphoneos")
+		defer releaseDir.Close()
+		if err == nil {
+			fileInfos, err = releaseDir.Readdir(0)
+			if err != nil {
+				return
+			}
+			for i := 0; i < len(fileInfos); i++ {
+				if fileInfos[i].IsDir() == false {
+					continue
+				}
+				b := appReg.Match([]byte(fileInfos[i].Name()))
+				if b == true {
+					appPath = buildwd + "/build/Release-iphoneos/" + fileInfos[i].Name()
+					break
+				}
+			}
+		}
+	}
+	if appPath == "" {
+		err = errors.New(".app file not found!")
+		return
+	}
+	logger.Debug("Find .app file at " + appPath)
+	// pack the .app into .ipa
+	// change the working directory before run xcrun
+	// appPath is a absolute path and will not be affected by chdir
+	// outfile here must be a absolute path.
+	logger.Debug("Enter " + workdir)
+	os.Chdir(workdir)
+	b := absolutePathReg.Match([]byte(outfile))
+	if b == false {
+		outfile = workdir + "/" + outfile
+	}
+	if config.Provision == nil {
+		logger.Debug("Provision not found!")
+		logger.Debug("Make ipa at " + outfile)
+		err = cmd.SyncCmd("xcrun", []string{"-sdk", "iphoneos", "PackageApplication", appPath, "-o", outfile})
+	} else {
+		err = cmd.SyncCmd("xcrun", []string{"-sdk", "iphoneos", "PackageApplication", appPath, "-o", outfile, "--embed", *config.Provision})
 	}
 	return
 }
